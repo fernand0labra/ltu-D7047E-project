@@ -9,7 +9,7 @@ class PIDController:
         self.integral = 0
 
     def compute(self, error, dt):
-        derivative = error - self.last_error / dt
+        derivative = (error - self.last_error) / dt
         self.integral += error * dt
 
         output = (self.kp * error) + (self.ki * self.integral) + (self.kd * derivative)

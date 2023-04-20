@@ -3,12 +3,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-import src.utils as utils
+import utils
 import matplotlib.pyplot as plt
-from src.controller.controller import PIDController
-from src.system.system import VanDerPol
-from src.system.data import DynamicSystemDataset
-from src.system.rnn import SystemRNN
+from controller.controller import PIDController
+from system.system import VanDerPol
+from system.data import DynamicSystemDataset
+from system.rnn import SystemRNN
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -23,7 +23,7 @@ print("#########################################################################
 # Instantiate the VanDerPol system
 sys = VanDerPol(mu=1, dt=0.01)
 
-PATH = "../dataset/system/van_der_pol.csv"
+PATH = "./data/system/van_der_pol.csv"
 if not os.path.isfile(PATH):
     # Input signal properties (for identification)
     data_count = 1000
@@ -49,7 +49,7 @@ output_dim = 1  # Output dimension (e.g., prediction)
 sys_rnn = SystemRNN(input_dim, hidden_dim, output_dim)
 sys_rnn.to(device)
 
-PATH = '../models/sys_rnn.pth'
+PATH = './models/sys_rnn.pth'
 if not os.path.isfile(PATH):
     sys_rnn.init_hidden(batch_size)
     trainloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
@@ -67,7 +67,7 @@ print("\n#######################################################################
 print("#                  Identification of Controller with NN                   #")
 print("###########################################################################\n")
 
-kp, ki, kd = 0.4, 0.2, 0
+kp, ki, kd = 20, 20, 10
 pid = PIDController(kp, ki, kd)
 
 t0 = 0

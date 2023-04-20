@@ -2,7 +2,7 @@ import ast
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
-import src.utils as utils
+import utils as utils
 import pandas as pd
 
 
