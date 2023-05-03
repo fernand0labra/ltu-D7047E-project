@@ -1,12 +1,12 @@
-import csv
-import matplotlib.pyplot as plt
-import numpy as np
 import torch
+import numpy as np
 import torch.nn as nn
+import matplotlib.pyplot as plt
 from torch.utils.tensorboard.writer import SummaryWriter
 
+from src.var import *
 
-def generate_random_steps(num_steps, max_step_height, max_signal_val, step_width):
+def generate_random_steps():
     """
     Generates a signal of random steps.
 
@@ -18,51 +18,32 @@ def generate_random_steps(num_steps, max_step_height, max_signal_val, step_width
     Returns:
         numpy.array: A 1D array representing the generated signal.
     """
-    signal = np.zeros(num_steps * step_width)  # Initialize the signal with zeros
+    signal = np.zeros(NUM_STEPS * STEP_WIDTH)  # Initialize the signal with zeros
     current_val = 0  # Start from 0
 
-    for i in range(num_steps):
+    for i in range(NUM_STEPS):
         # Generate a random step between -step_size and step_size
-        step = np.random.uniform(-max_step_height, max_step_height)
+        step = np.random.uniform(-MAX_STEP_HEIGHT, MAX_STEP_HEIGHT)
         # Update the current value with the step
         current_val += step
         # Clip the current value to be within the maximum value
-        current_val = np.clip(current_val, -max_signal_val, max_signal_val)
+        current_val = np.clip(current_val, -MAX_SIGNAL_VAL, MAX_SIGNAL_VAL)
         # Assign the current value to the signal
-        signal[i * step_width:(i + 1) * step_width] = current_val
+        signal[i * STEP_WIDTH:(i + 1) * STEP_WIDTH] = current_val
 
     return signal
 
 
-def save_signal_data(path, dataloader):
-    with open(path, mode='w', newline='') as file:
-        writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-
-        # write the header row
-        writer.writerow(['input', 'output'])
-
-        # iterate over the dataset and write each sample to the CSV file
-        for batch_idx, (input_data, output_data) in enumerate(dataloader):
-
-            # extract the data for each sample
-            input_column = input_data.tolist()[0]
-            output_column = output_data.tolist()[0]
-
-            # write the data to the CSV file
-            writer.writerow([input_column, output_column])
-
-
-def plot_signal_data(sys, net, device):
-    num_steps = 100
-    step_width = 100
-    max_step_height = 3
-    max_signal_val = 3.0
-
-    input_signal = generate_random_steps(num_steps, max_step_height, max_signal_val, step_width)
+def plot_signal_data(sys, net):
+    # [sequence_length] = [NUM_STEPS * STEP_WIDTH]
+    input_signal = generate_random_steps()
     ts, output_signal = sys.run(input_signal, 0)
 
-    u_tensor = torch.tensor(input_signal, dtype=torch.float32).unsqueeze(0).to(device)
-    generated_signal = net.forward(u_tensor)
+    # [batch_size, sequence_length, input_size] = [1, NUM_STEPS * STEP_WIDTH, 1]
+    u_tensor = torch.tensor(input_signal, dtype=torch.float32).unsqueeze(0).unsqueeze(2).to(DEVICE)
+
+    hidden_state = net.init_hidden(1)
+    generated_signal, hidden_state = net.forward(u_tensor, hidden_state)
 
     # Plot the generated input signal
     plt.plot(ts, input_signal)
@@ -79,59 +60,67 @@ def plot_signal_data(sys, net, device):
     plt.show()
 
     # Plot the generated output signal
-    plt.plot(ts, generated_signal.detach().numpy())
+    plt.plot(ts, generated_signal.view(-1).cpu().detach().numpy())
     plt.xlabel('Time (s)')
     plt.ylabel('rnn(t)')
     plt.title('RNN System Output')
     plt.show()
 
 
-def train(epochs, trainloader, optimizer, criterion, net, device):
+def train(epochs, trainloader, optimizer, criterion, net):
     writer = SummaryWriter("../logs")
 
     # Train the network
     for epoch in range(epochs):  # Loop over the dataset multiple times
 
         running_loss = 0.0
-        for i, (inputs, ground_truth) in enumerate(trainloader, 0):
-            inputs = inputs.to(device)
-            ground_truth = ground_truth[0].to(device)
+        for inputs, ground_truth in trainloader:  # input/target [batch_size,  NUM_STEPS * STEP_WIDTH]
+
+            hidden_state = net.init_hidden(len(inputs))
 
             # zero the parameter gradients
             optimizer.zero_grad()
 
+            # input/target [batch_size, sequence_length, input_size] = [batch_size, NUM_STEPS * STEP_WIDTH, 1]
+
+            inputs = inputs.unsqueeze(2).to(DEVICE)
+            ground_truth = ground_truth.unsqueeze(2).to(DEVICE)
+
             # forward + backward + optimize
-            outputs = net(inputs).to(device)  # GPU
+            outputs, hidden_state = net(inputs, hidden_state)
+            outputs = outputs.to(DEVICE)  # GPU
+
             loss = criterion(outputs, ground_truth)
-            writer.add_scalar("Loss/train", loss, epoch)
             loss.backward()
             optimizer.step()
 
             # print statistics
             running_loss += loss.item()
 
-        print(f'[{epoch + 1}] loss: {running_loss / 1000:.3f}')
+        writer.add_scalar("Loss/train", running_loss, epoch)
+        print(f'[{epoch + 1}] loss: {running_loss / DATA_COUNT:.3f}')
 
     writer.flush()
     writer.close()
 
 
-def test(testloader, net, device):
+def test(testloader, net):
     mse = 0
-    total = 0
     loss = nn.MSELoss()
     # since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
-        for (inputs, ground_truth) in testloader:
+        for inputs, ground_truth in testloader:
 
-            inputs = inputs.to(device)
-            ground_truth = ground_truth[0].to(device)
+            hidden_state = net.init_hidden(len(inputs))
 
-            # calculate outputs by running images through the network
-            outputs = net(inputs).to(device)
-            # the class with the highest energy is what we choose as prediction
-            total += inputs[0].size(0)
+            # input/target [batch_size, sequence_length, input_size] = [batch_size, NUM_STEPS * STEP_WIDTH, 1]
+            inputs = inputs.unsqueeze(2).to(DEVICE)
+            ground_truth = ground_truth.unsqueeze(2).to(DEVICE)
+            
+            outputs, hidden_state = net(inputs, hidden_state)
+            outputs = outputs.to(DEVICE)
+            
             mse += loss(outputs, ground_truth)
 
-    print(f'Average MSE of the network on the 1000 signal points: {100 * mse / total:.3f}')
+    print(f'Average MSE of the network on the {DATA_COUNT} signal points: {100 * mse / DATA_COUNT:.3f}')
 
