@@ -4,7 +4,7 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from src.var import *
+from var import *
 
 def generate_random_steps():
     """
@@ -54,16 +54,11 @@ def plot_signal_data(sys, net):
 
     # Plot the generated output signal
     plt.plot(ts, output_signal)
-    plt.xlabel('Time (s)')
-    plt.ylabel('y(t)')
-    plt.title('Van der Pol System Output')
-    plt.show()
-
-    # Plot the generated output signal
     plt.plot(ts, generated_signal.view(-1).cpu().detach().numpy())
     plt.xlabel('Time (s)')
-    plt.ylabel('rnn(t)')
-    plt.title('RNN System Output')
+    plt.ylabel('y(t)')
+    plt.title('Van der Pol/RNN System Output')
+    plt.legend(["output", "rnn"])
     plt.show()
 
 
@@ -74,6 +69,7 @@ def train(epochs, trainloader, optimizer, criterion, net):
     for epoch in range(epochs):  # Loop over the dataset multiple times
 
         running_loss = 0.0
+        num_batches = 0
         for inputs, ground_truth in trainloader:  # input/target [batch_size,  NUM_STEPS * STEP_WIDTH]
 
             hidden_state = net.init_hidden(len(inputs))
@@ -87,7 +83,7 @@ def train(epochs, trainloader, optimizer, criterion, net):
             ground_truth = ground_truth.unsqueeze(2).to(DEVICE)
 
             # forward + backward + optimize
-            outputs, hidden_state = net(inputs, hidden_state)
+            outputs, _ = net(inputs, hidden_state)
             outputs = outputs.to(DEVICE)  # GPU
 
             loss = criterion(outputs, ground_truth)
@@ -96,9 +92,10 @@ def train(epochs, trainloader, optimizer, criterion, net):
 
             # print statistics
             running_loss += loss.item()
+            num_batches += 1
 
         writer.add_scalar("Loss/train", running_loss, epoch)
-        print(f'[{epoch + 1}] loss: {running_loss / DATA_COUNT:.3f}')
+        print(f'[{epoch + 1}] loss: {running_loss / num_batches:.3f}')
 
     writer.flush()
     writer.close()
@@ -106,6 +103,7 @@ def train(epochs, trainloader, optimizer, criterion, net):
 
 def test(testloader, net):
     mse = 0
+    num_batches = 0
     loss = nn.MSELoss()
     # since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
@@ -121,6 +119,7 @@ def test(testloader, net):
             outputs = outputs.to(DEVICE)
             
             mse += loss(outputs, ground_truth)
+            num_batches += 1
 
-    print(f'Average MSE of the network on the {DATA_COUNT} signal points: {100 * mse / DATA_COUNT:.3f}')
+    print(f'Average MSE of the network on the {DATA_COUNT} signal points: {mse/num_batches:.3f}')
 

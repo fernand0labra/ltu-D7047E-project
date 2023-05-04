@@ -1,8 +1,8 @@
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
-from src.utils import generate_random_steps
-from src.var import *
+from utils import generate_random_steps
+from var import *
 
 
 # Define the dynamic system dataset

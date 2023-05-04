@@ -13,7 +13,7 @@ MODEL_PATH = lambda type: './models/sys_rnn.pth' if type == "rnn" else './models
 # Define signal generation parameters
 DATA_COUNT = 1000
 
-NUM_STEPS = 10
+NUM_STEPS = 20
 STEP_WIDTH = 100
 
 MAX_STEP_HEIGHT = 3
