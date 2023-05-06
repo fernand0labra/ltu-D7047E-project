@@ -6,8 +6,8 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # Define model and dataset paths
-DATASET_PATH = "./data/system/van_der_pol.pt"
-MODEL_PATH = lambda type: './models/sys_rnn.pth' if type == "rnn" else './models/sys_lstm.pth'
+DATASET_PATH = "./data/van_der_pol.pt"
+MODEL_PATH = lambda type: './models/sys_rnn.pth' if type == "vanilla" else './models/sys_lstm.pth'
 
 
 # Define signal generation parameters

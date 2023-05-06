@@ -1,37 +1,28 @@
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
-from utils import generate_random_steps
 from var import *
+from utils import generate_random_steps
 
-
-# Define the dynamic system dataset
 class DynamicSystemDataset(Dataset):
 
-    def __init__(self):
-        self.inputs = None
-        self.outputs = None
+    def __init__(self, system):
 
-    @classmethod
-    def init_create_dataset(cls, system):
-        # Create empty input and outputs tensors
-        # with shape (data_count, num_steps * step_width) and data type float32
         tensor_shape = (DATA_COUNT, NUM_STEPS * STEP_WIDTH)
 
-        dataset = DynamicSystemDataset()
-        dataset.inputs = torch.empty(tensor_shape, dtype=torch.float32)
-        dataset.outputs = torch.empty(tensor_shape, dtype=torch.float32)
+        self.inputs = torch.empty(tensor_shape, dtype=torch.float32)
+        self.outputs = torch.empty(tensor_shape, dtype=torch.float32)
 
         for i in tqdm(range(DATA_COUNT)):
             u = generate_random_steps()
-            _, y = system.run(u, 0)
-            dataset.inputs[i, :] = torch.from_numpy(u)
-            dataset.outputs[i, :] = torch.from_numpy(y)
+            ts, y = system.run(u, 0)
+            self.inputs[i, :] = torch.from_numpy(u)
+            self.outputs[i, :] = torch.from_numpy(y)
+
+        self.ts = ts
 
         # Save dataset
-        torch.save(dataset, DATASET_PATH)
-
-        return dataset
+        torch.save(self, DATASET_PATH)
 
     def __len__(self):
         return len(self.inputs)
