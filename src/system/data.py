@@ -1,52 +1,28 @@
-import ast
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
-import utils as utils
-import pandas as pd
+from var import *
+from utils import generate_random_steps
 
-
-# Define the dynamic system dataset
 class DynamicSystemDataset(Dataset):
 
-    def __init__(self):
-        self.inputs = None
-        self.outputs = None
+    def __init__(self, system):
 
-    @classmethod
-    def init_create_dataset(cls, system, data_count, num_steps, step_width, max_step_height, max_signal_val):
-        # Create empty input and outputs tensors
-        # with shape (data_count, num_steps * step_width) and data type float32
-        tensor_shape = (data_count, num_steps * step_width)
+        tensor_shape = (DATA_COUNT, NUM_STEPS * STEP_WIDTH)
 
-        dataset = DynamicSystemDataset()
-        dataset.inputs = torch.empty(tensor_shape, dtype=torch.float32)
-        dataset.outputs = torch.empty(tensor_shape, dtype=torch.float32)
+        self.inputs = torch.empty(tensor_shape, dtype=torch.float32)
+        self.outputs = torch.empty(tensor_shape, dtype=torch.float32)
 
-        for i in tqdm(range(data_count)):
-            u = utils.generate_random_steps(num_steps, max_step_height, max_signal_val, step_width)
-            _, y = system.run(u, 0)
-            dataset.inputs[i, :] = torch.from_numpy(u)
-            dataset.outputs[i, :] = torch.from_numpy(y)
+        for i in tqdm(range(DATA_COUNT)):
+            u = generate_random_steps()
+            ts, y = system.run(u, 0)
+            self.inputs[i, :] = torch.from_numpy(u)
+            self.outputs[i, :] = torch.from_numpy(y)
 
-        return dataset
+        self.ts = ts
 
-    @classmethod
-    def init_load_dataset(cls, path):
-        dataset_file = pd.read_csv(path)
-        inputs = list(map(ast.literal_eval, dataset_file["input"]))
-        outputs = list(map(ast.literal_eval, dataset_file["output"]))
-
-        dataset = DynamicSystemDataset()
-
-        dataset.inputs = torch.tensor(inputs, dtype=torch.float32)
-        dataset.outputs = torch.tensor(outputs, dtype=torch.float32)
-
-        return dataset
-
-    def save_dataset(self, path):
-        dataloader = torch.utils.data.DataLoader(self, batch_size=1, shuffle=True, num_workers=0)
-        utils.save_signal_data(path, dataloader)
+        # Save dataset
+        torch.save(self, DATASET_PATH)
 
     def __len__(self):
         return len(self.inputs)
