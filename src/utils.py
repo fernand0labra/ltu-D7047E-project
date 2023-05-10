@@ -81,7 +81,6 @@ def train_validate(epochs: int, train_loader: DataLoader, val_loader: DataLoader
 
             # forward + backward + optimize
             outputs, _ = net(inputs)
-            outputs = outputs.to(DEVICE)  # GPU
 
             loss = criterion(outputs, ground_truth)
             loss.backward()
@@ -115,7 +114,6 @@ def test(test_loader: DataLoader, criterion, net: nn.Module):
             ground_truth = ground_truth.unsqueeze(2).to(DEVICE)
             
             outputs, _ = net(inputs)
-            outputs = outputs.to(DEVICE)
             
             loss += criterion(outputs, ground_truth)
             num_batches += 1
