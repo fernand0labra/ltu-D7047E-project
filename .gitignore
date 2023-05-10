@@ -2,3 +2,6 @@ logs
 *pycache*
 */legacy/*
 data
+best.pth
+test.py
+test.ipynb
